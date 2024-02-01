@@ -18,12 +18,12 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
         try
         {
             var sql = """
-            INSERT INTO Usuarios 
-                (Nome, Email, Sexo, RG, CPF, NomeMae, SituacaoCadastro, DataCadastro)
-            VALUES 
-                (@Nome, @Email, @Sexo, @RG, @CPF, @NomeMae, @SituacaoCadastro, @DataCadastro);
-            
-                SELECT last_insert_rowid();
+                INSERT INTO Usuarios 
+                    (Nome, Email, Sexo, RG, CPF, NomeMae, SituacaoCadastro, DataCadastro)
+                VALUES 
+                    (@Nome, @Email, @Sexo, @RG, @CPF, @NomeMae, @SituacaoCadastro, @DataCadastro);
+                
+                    SELECT last_insert_rowid();
             """;
 
             int id = await _connection.QueryFirstAsync<int>(sql, usuario, transaction);
@@ -31,10 +31,10 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
             if (usuario.Contato is not null)
             {
                 sql = """
-                INSERT INTO Contatos 
-                    (UsuarioId, Telefone, Celular)
-                VALUES (@UsuarioId, @Telefone, @Celular);
-            """;
+                    INSERT INTO Contatos 
+                        (UsuarioId, Telefone, Celular)
+                    VALUES (@UsuarioId, @Telefone, @Celular);
+                """;
 
                 usuario.Contato.UsuarioId = id;
                 await _connection.ExecuteAsync(sql, usuario.Contato, transaction);
@@ -68,16 +68,35 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 
     public async Task<List<Usuario>> FindAllAsync()
     {
+        // var sql = "SELECT * FROM Usuarios;";
+        // var usuarios = await _connection.QueryAsync<Usuario>(sql);
+
         var sql = """
-            SELECT * FROM Usuarios u LEFT JOIN Contatos c ON u.Id = c.UsuarioId;
+            SELECT * FROM 
+                Usuarios u, EnderecosEntrega ee, Contatos c  
+            WHERE 
+                u.Id = ee.UsuarioId AND 
+                u.Id = c.UsuarioId;
         """;
-        var usuarios = await _connection.QueryAsync<Usuario, Contato, Usuario>(sql, (usuario, contato) =>
-        {
-            usuario.Contato = contato;
-            return usuario;
+
+        Dictionary<int, Usuario> consult = [];
+
+        var usuarios = await _connection.QueryAsync<Usuario, Contato, EnderecoEntrega, Dictionary<int, Usuario>>(sql, (usuario, contato, enderecoEntrega) => {
+            if (!consult.TryGetValue(usuario.Id, out Usuario? value))
+            {
+                usuario.Contato = contato;
+                consult.Add(usuario.Id, usuario);
+            }
+            else 
+            {
+                var usuarioRecuperado = value;
+                if (!usuarioRecuperado.EnderecoEntregas.Any(x => x.Id == enderecoEntrega.Id))
+                    usuarioRecuperado.EnderecoEntregas.Add(enderecoEntrega);
+            }
+            return consult;
         });
 
-        return usuarios.ToList();
+        return usuarios.SelectMany(x => x.Values).ToList();
     }
 
     public async Task<Usuario?> FindByIdAsync(int id)
@@ -105,14 +124,13 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
             var sql = """
                 UPDATE Usuarios 
                     SET Nome = @Nome, Email = @Email, Sexo = @Sexo, RG = @RG, CPF = @CPF, NomeMae = @NomeMae, SituacaoCadastro = @SituacaoCadastro, DataCadastro = @DataCadastro
-                WHERE Usuarios.Id = @Id;
+                WHERE 
+                    Usuarios.Id = @Id;
             """;
 
             if (usuario.Contato is not null)
             {   
-                var sqlContact = """
-                    UPDATE Contatos SET Telefone = @Telefone, Celular = @Celular WHERE UsuarioId = @UsuarioId;
-                """;
+                var sqlContact = "UPDATE Contatos SET Telefone = @Telefone, Celular = @Celular WHERE UsuarioId = @UsuarioId";
 
                 usuario.Contato!.UsuarioId = usuario.Id;
 
