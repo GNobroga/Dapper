@@ -22,5 +22,5 @@ public class EnderecoEntrega
 
     public string? Complemento { get; set; }
 
-    public Usuario Usuario { get; set; }
+    public Usuario? Usuario { get; set; }
 }

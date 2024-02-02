@@ -1,24 +1,17 @@
 using System.Data;
-using System.Net;
 using Dapper;
-using DapperTesting.DatabaseFactories;
+using DapperTesting.Factories;
 using DapperTesting.Models;
-using Microsoft.VisualBasic;
 namespace DapperTesting.Repositories.Impl;
 
 public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioRepository
 {
-    private readonly IDbConnection _connection = connectionFactory.CreateConnection();
+    private readonly IDbConnection _connection = connectionFactory.Connection;
 
     public async Task<Usuario> CreateAsync(Usuario usuario)
     {
+        return await connectionFactory.AtomicOperation(async (transaction) => {
 
-        _connection.Open();
-
-        var transaction = _connection.BeginTransaction();
-
-        try
-        {
             var sql = """
                 INSERT INTO Usuarios 
                     (Nome, Email, Sexo, RG, CPF, NomeMae, SituacaoCadastro, DataCadastro)
@@ -28,7 +21,7 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
                     SELECT last_insert_rowid();
             """;
 
-            int id = await _connection.QueryFirstAsync<int>(sql, usuario, transaction);
+             int id = await _connection.QueryFirstAsync<int>(sql, usuario, transaction);
 
             if (usuario.Contato is not null)
             {
@@ -59,18 +52,8 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
                 }
             }
 
-            transaction.Commit();
-            return (await FindByIdAsync(id))!;
-        }
-        catch
-        {
-            transaction.Rollback();
-            throw;
-        }
-        finally
-        {
-            _connection.Close();
-        }
+            return usuario;
+        });
     }
 
     public async Task<bool> DeleteAsync(int id)
@@ -167,13 +150,9 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
     public async Task<Usuario> UpdateAsync(Usuario usuario)
     {
 
-        var transaction = _connection.BeginTransaction();
-        _connection.Open();
+        return await connectionFactory.AtomicOperation<Usuario>(async (transaction) => {
 
-        try
-        {
-
-            var sql = """
+             var sql = """
                 UPDATE Usuarios 
                     SET Nome = @Nome, Email = @Email, Sexo = @Sexo, RG = @RG, CPF = @CPF, NomeMae = @NomeMae, SituacaoCadastro = @SituacaoCadastro, DataCadastro = @DataCadastro
                 WHERE 
@@ -209,18 +188,9 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 
             await _connection.ExecuteAsync(sql, usuario, transaction);
 
-            transaction.Commit();
             return (await FindByIdAsync(usuario.Id))!;
-        } 
-        catch 
-        {
-            transaction.Rollback();
-            throw;
-        }
-        finally 
-        {
-            _connection.Close();
-        }
-        
+        });
+
+
     }
 }

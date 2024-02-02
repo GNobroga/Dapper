@@ -1,6 +1,6 @@
-using DapperTesting.DatabaseFactories;
-using DapperTesting.DatabaseFactories.Impl;
 using DapperTesting.Extensions;
+using DapperTesting.Factories;
+using DapperTesting.Factories.Concrete;
 using DapperTesting.Repositories;
 using DapperTesting.Repositories.Impl;
 
