@@ -8,7 +8,7 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 {
     private readonly IDbConnection _connection = connectionFactory.Connection;
 
-    public async Task<Usuario> CreateAsync(Usuario usuario)
+    public async Task<Usuario> CreateAsync(Usuario usuario, CancellationToken cancellationToken = default)
     {
         return await connectionFactory.AtomicOperation(async (transaction) => {
 
@@ -56,7 +56,7 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
         });
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         return await connectionFactory.AtomicOperation(async (transaction) => {
             var usuario = await FindByIdAsync(id);
@@ -71,7 +71,7 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
     }
 
 
-    public async Task<List<Usuario>> FindAllAsync()
+    public async Task<List<Usuario>> FindAllAsync(CancellationToken cancellationToken = default)
     {
 
         // A consulta precisa ser feita na ordem pra poder dar o SplitOn no identificador.
@@ -107,7 +107,7 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
         return usuarios;
     }
 
-    public async Task<Usuario?> FindByIdAsync(int id)
+    public async Task<Usuario?> FindByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         // Relacionamento N x N
         var sql = """
@@ -149,10 +149,10 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
         return usuarios.FirstOrDefault();
     }
 
-    public async Task<Usuario> UpdateAsync(Usuario usuario)
+    public async Task<Usuario> UpdateAsync(Usuario usuario, CancellationToken cancellationToken = default)
     {
 
-        return await connectionFactory.AtomicOperation<Usuario>(async (transaction) => {
+        return await connectionFactory.AtomicOperation(async (transaction) => {
 
              var sql = """
                 UPDATE Usuarios 
