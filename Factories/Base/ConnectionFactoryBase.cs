@@ -1,21 +1,27 @@
 using System.Data;
-using Microsoft.Data.Sqlite;
 
 namespace DapperTesting.Factories.Base;
 
 public abstract class ConnectionFactoryBase : IConnectionFactory
 {
-    protected abstract IDbConnection _connection { get;  }
+    protected readonly IDbConnection _connection;
 
     public IDbConnection Connection => _connection;
 
     private IDbTransaction? _transaction;
 
+    public ConnectionFactoryBase(IDbConnection dbConnection) 
+    {
+        _connection = dbConnection;
+        _connection.Open();
+    }
+
+
     public async Task<T> AtomicOperation<T>(Func<IDbTransaction, Task<T>> callback)
     {
-        StartTransaction();
+         _transaction = _connection.BeginTransaction();
         try 
-        {
+        {   
             var result = callback(_transaction!);
             _transaction!.Commit();
             return await result;
@@ -27,14 +33,7 @@ public abstract class ConnectionFactoryBase : IConnectionFactory
         } 
         finally 
         {
-          Connection.Close(); 
+          _connection.Close(); 
         }
-    }
-
-    public void StartTransaction()
-    {
-        ArgumentNullException.ThrowIfNull(Connection);
-        Connection.Open();
-        _transaction = Connection.BeginTransaction();
     }
 }

@@ -6,5 +6,7 @@ namespace DapperTesting.Factories.Concrete;
 
 public class SqliteConnectionFactory : ConnectionFactoryBase
 {
-    protected override IDbConnection _connection => new SqliteConnection("Data Source=app.db");
+    public SqliteConnectionFactory() : base(new SqliteConnection("Data Source=app.db"))
+    {}
+
 }
