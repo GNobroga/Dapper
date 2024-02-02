@@ -21,7 +21,7 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
                     SELECT last_insert_rowid();
             """;
 
-             int id = await _connection.QueryFirstAsync<int>(sql, usuario, transaction);
+            int id = await _connection.QueryFirstAsync<int>(sql, usuario, transaction);
 
             if (usuario.Contato is not null)
             {
@@ -73,7 +73,6 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 
     public async Task<List<Usuario>> FindAllAsync(CancellationToken cancellationToken = default)
     {
-
         // A consulta precisa ser feita na ordem pra poder dar o SplitOn no identificador.
         var sql = """
            SELECT * FROM 
@@ -85,9 +84,10 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 
         List<Usuario> usuarios = [];
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         // O Dapper vai trazer várias colunas parecidas, pois é uma relação 1 para N entre usuario e EndereçoEntrega.
         await _connection.QueryAsync<Usuario, Contato, EnderecoEntrega, Usuario>(sql, (usuario, contato, enderecoEntrega) => {
-
             if (!usuarios.Any(x => x.Id == usuario.Id))
             {
                 usuario.EnderecoEntregas ??= [];
