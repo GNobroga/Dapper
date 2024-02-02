@@ -102,3 +102,56 @@ No código abaixo eu faço um SQL que faz vários JUNÇÃO de algumas tabelas e 
     }
 
 ```
+
+## Multiplo ResultSets
+
+É possível fazer múltiplas consultas no Dapper usando o **QueryMultiple**. Muito útil pra criar relatórios.
+
+```sql
+    SELECT * FROM Usuarios WHERE Id = @Id;
+    SELECT * FROM Contatos WHERE UsuarioId = @Id;
+    SELECT * FROM EnderecosEntrega WHERE UsuarioId = @Id;
+    SELECT D.* FROM UsuariosDepartamentos UD INNER JOIN Departamentos D ON UD.Departamento.Id = D.Id WHERE UD.UsuarioId = @Id;
+```
+
+```cs
+   var resultSets = await _connection.QueryMultipleAsync(sql, new { Id = 1 });
+   var usuario = resultSets.Read<Usuario>().SingleOrDefault();
+   var contato = resultSets.Read<Contato>().SingleOrDefault();
+   var enderecosEntrega = resultSets.Read<EnderecosEntrega>().ToList();
+   var departamentos = resultSets.Read<Departamentos>().ToList();
+```
+
+
+## Utilizando Stored Procedure
+
+É possível executar Store Procedure, é possível passar parâmetros também.
+
+```cs
+    _connection.Query<Usuario>("StoreProcedureName", commandType: CommandType.StoredProcedure);
+```
+## Biblioteca FluentMap
+
+Permite mapear colunas com nomes diferentes das propriedades, pois o Dapper ele mapeia as colunas se baseando no nome da Propriedade, independente se estiver LowerCase, UpperCase, etc.
+
+```cs
+    var usuarios = _connection.Query<Usuario>("SELECT * FROM Usuarios;");
+```
+
+```cs
+    public class UsuarioMap : EntityMap<Usuario>
+    {
+        public UsuarioMap()
+        {
+            Map(x => x.Property).ToColumn("ColumnName");
+        }
+    }
+
+    FluentMapper.Initialize(config => config.AddMap(new UsuarioMap()));
+
+```
+
+
+## Helpful Packages
+
+. Dapper.Contrib - Pacote que extende o Dapper com operações de um CRUD básico.
