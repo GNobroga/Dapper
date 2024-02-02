@@ -1,7 +1,9 @@
 using System.Data;
+using System.Net;
 using Dapper;
 using DapperTesting.DatabaseFactories;
 using DapperTesting.Models;
+using Microsoft.VisualBasic;
 namespace DapperTesting.Repositories.Impl;
 
 public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioRepository
@@ -68,35 +70,37 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 
     public async Task<List<Usuario>> FindAllAsync()
     {
-        // var sql = "SELECT * FROM Usuarios;";
-        // var usuarios = await _connection.QueryAsync<Usuario>(sql);
 
+        // A consulta precisa ser feita na ordem pra poder dar o SplitOn no identificador.
         var sql = """
-            SELECT * FROM 
-                Usuarios u, EnderecosEntrega ee, Contatos c  
-            WHERE 
-                u.Id = ee.UsuarioId AND 
-                u.Id = c.UsuarioId;
+           SELECT * FROM 
+                Usuarios u
+                LEFT JOIN Contatos c ON C.UsuarioId = u.Id
+                LEFT JOIN EnderecosEntrega ee ON ee.UsuarioId = u.Id;
+               
         """;
 
-        Dictionary<int, Usuario> consult = [];
+        List<Usuario> usuarios = [];
 
-        var usuarios = await _connection.QueryAsync<Usuario, Contato, EnderecoEntrega, Dictionary<int, Usuario>>(sql, (usuario, contato, enderecoEntrega) => {
-            if (!consult.TryGetValue(usuario.Id, out Usuario? value))
+        await _connection.QueryAsync<Usuario, Contato, EnderecoEntrega, Usuario>(sql, (usuario, contato, enderecoEntrega) => {
+
+            if (!usuarios.Any(x => x.Id == usuario.Id))
             {
+                usuario.EnderecoEntregas ??= [];
                 usuario.Contato = contato;
-                consult.Add(usuario.Id, usuario);
-            }
+                usuarios.Add(usuario);
+            } 
             else 
             {
-                var usuarioRecuperado = value;
-                if (!usuarioRecuperado.EnderecoEntregas.Any(x => x.Id == enderecoEntrega.Id))
-                    usuarioRecuperado.EnderecoEntregas.Add(enderecoEntrega);
+                usuario = usuarios.Find(x => x.Id == usuario.Id)!;
             }
-            return consult;
+
+             usuario.EnderecoEntregas.Add(enderecoEntrega);
+
+            return usuario;
         });
 
-        return usuarios.SelectMany(x => x.Values).ToList();
+        return usuarios;
     }
 
     public async Task<Usuario?> FindByIdAsync(int id)
