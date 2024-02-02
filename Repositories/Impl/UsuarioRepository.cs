@@ -58,14 +58,16 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 
     public async Task<bool> DeleteAsync(int id)
     {
-        var usuario = await FindByIdAsync(id);
+        return await connectionFactory.AtomicOperation(async (transaction) => {
+            var usuario = await FindByIdAsync(id);
 
-        if (usuario is null) return false;
+            if (usuario is null) return false;
 
-        var sql = "DELETE FROM Usuarios WHERE Id = @id";
-        await _connection.ExecuteAsync(sql, new { id });
+            var sql = "DELETE FROM Usuarios WHERE Id = @id";
+            await _connection.ExecuteAsync(sql, new { id }, transaction);
 
-        return true;
+            return true;
+        });
     }
 
 
