@@ -124,17 +124,20 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 
     public async Task<Usuario?> FindByIdAsync(int id)
     {
+        // Relacionamento N x N
         var sql = """
-             SELECT * FROM 
-                Usuarios u
-                LEFT JOIN Contatos c ON C.UsuarioId = u.Id
-                LEFT JOIN EnderecosEntrega ee ON ee.UsuarioId = u.Id
-                WHERE u.Id = @id;
+            SELECT u.*, c.*, ee.*, d.* FROM 
+            Usuarios u
+            LEFT JOIN Contatos c ON C.UsuarioId = u.Id
+            LEFT JOIN EnderecosEntrega ee ON ee.UsuarioId = u.Id
+            INNER JOIN UsuariosDepartamentos ud ON ud.UsuarioId = u.Id
+            INNER JOIN Departamentos d ON d.Id = ud.DepartamentoId
+            WHERE u.Id = @id;
         """;
 
          List<Usuario> usuarios = [];
 
-        await _connection.QueryAsync<Usuario, Contato, EnderecoEntrega, Usuario>(sql, (usuario, contato, enderecoEntrega) => {
+        await _connection.QueryAsync<Usuario, Contato, EnderecoEntrega, Departamento, Usuario>(sql, (usuario, contato, enderecoEntrega, departamento) => {
 
             if (!usuarios.Any(x => x.Id == usuario.Id))
             {
@@ -148,6 +151,12 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
             }
 
              usuario.EnderecoEntregas.Add(enderecoEntrega);
+            
+            if (!usuario.Departamentos.Any(x => x.Id == departamento.Id)) 
+            {
+                 usuario.Departamentos.Add(departamento);
+            }
+            
 
             return usuario;
         }, new { id });
