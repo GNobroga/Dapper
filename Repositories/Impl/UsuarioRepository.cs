@@ -41,6 +41,24 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
                 usuario.Contato.UsuarioId = id;
                 await _connection.ExecuteAsync(sql, usuario.Contato, transaction);
             }
+
+            if (usuario.EnderecoEntregas is not null && usuario.EnderecoEntregas is { Count: > 0})
+            {
+                sql = """
+                    INSERT INTO EnderecosEntrega 
+                        (UsuarioId, NomeEndereco, CEP, Estado, Bairro, Endereco, Numero, Complemento, Cidade)
+                    VALUES 
+                        (@UsuarioId, @NomeEndereco, @CEP, @Estado, @Bairro, @Endereco, @Numero, @Complemento, @Cidade);
+                """;
+
+                foreach (var enderecoEntrega in usuario.EnderecoEntregas)
+                {
+                    Console.WriteLine(enderecoEntrega.CEP);
+                    enderecoEntrega.UsuarioId = id;
+                    await _connection.ExecuteAsync(sql, enderecoEntrega);
+                }
+            }
+
             transaction.Commit();
             return (await FindByIdAsync(id))!;
         }
@@ -82,6 +100,7 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 
         List<Usuario> usuarios = [];
 
+        // O Dapper vai trazer várias colunas parecidas, pois é uma relação 1 para N entre usuario e EndereçoEntrega.
         await _connection.QueryAsync<Usuario, Contato, EnderecoEntrega, Usuario>(sql, (usuario, contato, enderecoEntrega) => {
 
             if (!usuarios.Any(x => x.Id == usuario.Id))
@@ -105,11 +124,31 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
 
     public async Task<Usuario?> FindByIdAsync(int id)
     {
-        var sql = "SELECT * FROM Usuarios u LEFT JOIN Contatos c ON u.Id = c.UsuarioId WHERE u.Id = @id";
+        var sql = """
+             SELECT * FROM 
+                Usuarios u
+                LEFT JOIN Contatos c ON C.UsuarioId = u.Id
+                LEFT JOIN EnderecosEntrega ee ON ee.UsuarioId = u.Id
+                WHERE u.Id = @id;
+        """;
 
-        var usuarios = await _connection.QueryAsync<Usuario, Contato, Usuario>(sql, (usuario, contato) =>
-        {
-            usuario.Contato = contato;
+         List<Usuario> usuarios = [];
+
+        await _connection.QueryAsync<Usuario, Contato, EnderecoEntrega, Usuario>(sql, (usuario, contato, enderecoEntrega) => {
+
+            if (!usuarios.Any(x => x.Id == usuario.Id))
+            {
+                usuario.EnderecoEntregas ??= [];
+                usuario.Contato = contato;
+                usuarios.Add(usuario);
+            } 
+            else 
+            {
+                usuario = usuarios.Find(x => x.Id == usuario.Id)!;
+            }
+
+             usuario.EnderecoEntregas.Add(enderecoEntrega);
+
             return usuario;
         }, new { id });
 
@@ -139,6 +178,24 @@ public class UsuarioRepository(IConnectionFactory connectionFactory) : IUsuarioR
                 usuario.Contato!.UsuarioId = usuario.Id;
 
                 await _connection.ExecuteAsync(sqlContact, usuario.Contato, transaction);
+            }
+
+            if (usuario.EnderecoEntregas is not null && usuario.EnderecoEntregas is { Count: > 0})
+            {   
+
+                sql = "DELETE FROM EnderecosEntrega WHERE UsuarioId = @id";
+
+                foreach (var enderecoEntrega in usuario.EnderecoEntregas)
+                {
+                    await _connection.ExecuteAsync(sql, new { id = usuario.Id });
+                    sql = """
+                        INSERT INTO EnderecosEntrega 
+                            (UsuarioId, NomeEndereco, CEP, Estado, Bairro, Endereco, Numero, Complemento, Cidade)
+                        VALUES 
+                            (@UsuarioId, @NomeEndereco, @CEP, @Estado, @Bairro, @Endereco, @Numero, @Complemento, @Cidade);
+                    """;
+                    await _connection.ExecuteAsync(sql, enderecoEntrega);
+                }
             }
 
             await _connection.ExecuteAsync(sql, usuario, transaction);
